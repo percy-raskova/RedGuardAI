@@ -5,34 +5,75 @@ Handles Ollama invocation and Moltbook API interactions.
 """
 
 import json
-import os
-import sys
+import logging
+import time
 from datetime import datetime
-from pathlib import Path
+from functools import wraps
 
 import requests
 
-# Paths
-SCRIPT_DIR = Path(__file__).parent
-SYSTEM_PROMPT_PATH = SCRIPT_DIR / "SYSTEM_PROMPT.md"
-STATE_PATH = SCRIPT_DIR / "state.json"
-CREDS_PATH = SCRIPT_DIR / "credentials.json"
-ALT_CREDS_PATH = Path.home() / ".config" / "moltbook" / "credentials.json"
+# Import centralized config
+from config import (
+    AGENT_NAME,
+    SYSTEM_PROMPT_PATH,
+    STATE_PATH,
+    CREDS_PATH,
+    ALT_CREDS_PATH,
+    MOLTBOOK_BASE,
+    OLLAMA_URL,
+    MODEL,
+    TOKEN_LIMITS,
+    REQUEST_TIMEOUT,
+)
 
-# Moltbook API
-MOLTBOOK_BASE = "https://www.moltbook.com/api/v1"
+# Set up module logger
+log = logging.getLogger('redguard.agent')
 
-# Ollama
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "mlmlml:latest"
 
-# Token limits - model has 131K context, be very generous
-TOKEN_LIMITS = {
-    "comment": 3200,     # Comments: substantial revolutionary discourse
-    "reply": 2400,       # Replies: room for full dialectical engagement
-    "post": 6000,        # Posts: full agitprop manifestos with theory
-    "default": 4096,
-}
+def retry_on_failure(max_retries: int = 3, backoff_base: float = 1.0):
+    """
+    Retry decorator with exponential backoff for network errors.
+    Retries on: Timeout, ConnectionError, 5xx HTTP errors.
+    Does NOT retry on: 4xx client errors (auth, not found, rate limit).
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except requests.exceptions.Timeout as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        sleep_time = backoff_base * (2 ** attempt)
+                        log.warning(f"Timeout on {func.__name__}, retry {attempt + 1}/{max_retries} after {sleep_time}s")
+                        time.sleep(sleep_time)
+                    continue
+                except requests.exceptions.ConnectionError as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        sleep_time = backoff_base * (2 ** attempt)
+                        log.warning(f"Connection error on {func.__name__}, retry {attempt + 1}/{max_retries} after {sleep_time}s")
+                        time.sleep(sleep_time)
+                    continue
+                except requests.exceptions.HTTPError as e:
+                    # Only retry on 5xx server errors
+                    if e.response is not None and e.response.status_code >= 500:
+                        last_exception = e
+                        if attempt < max_retries - 1:
+                            sleep_time = backoff_base * (2 ** attempt)
+                            log.warning(f"Server error {e.response.status_code} on {func.__name__}, retry {attempt + 1}/{max_retries} after {sleep_time}s")
+                            time.sleep(sleep_time)
+                        continue
+                    # Don't retry 4xx errors - they won't succeed
+                    raise
+            # All retries exhausted
+            if last_exception:
+                raise last_exception
+            return None
+        return wrapper
+    return decorator
 
 
 def load_credentials():
@@ -116,23 +157,72 @@ def invoke_redguard(prompt: str, max_tokens: int = None, task_type: str = "defau
         raise RuntimeError(f"Ollama error: {e}")
 
 
+@retry_on_failure(max_retries=3, backoff_base=1.5)
 def moltbook_request(method: str, endpoint: str, data: dict = None) -> dict:
-    """Make authenticated request to Moltbook API"""
+    """
+    Make authenticated request to Moltbook API.
+
+    Returns:
+        dict: Response JSON on success, empty dict {} on error.
+
+    Raises:
+        RuntimeError: On rate limiting (429) - caller should back off.
+        requests.exceptions.HTTPError: On 4xx client errors (after logging).
+    """
     creds = load_credentials()
-    headers = {
-        "Authorization": f"Bearer {creds['api_key']}",
-        "Content-Type": "application/json"
-    }
     url = f"{MOLTBOOK_BASE}/{endpoint.lstrip('/')}"
-    
-    response = requests.request(method, url, headers=headers, json=data, timeout=30)
-    
+
+    # Conditionally construct request: only include json/Content-Type when data exists
+    # Passing json=None with Content-Type header causes malformed requests that get 401
+    if data is not None:
+        headers = {
+            "Authorization": f"Bearer {creds['api_key']}",
+            "Content-Type": "application/json"
+        }
+        response = requests.request(
+            method, url, headers=headers, json=data, timeout=REQUEST_TIMEOUT
+        )
+    else:
+        headers = {"Authorization": f"Bearer {creds['api_key']}"}
+        response = requests.request(
+            method, url, headers=headers, timeout=REQUEST_TIMEOUT
+        )
+
+    # Handle rate limiting explicitly
     if response.status_code == 429:
-        retry_after = response.json().get("retry_after_minutes", 30)
+        try:
+            retry_after = response.json().get("retry_after_minutes", 30)
+        except (json.JSONDecodeError, ValueError):
+            retry_after = 30
         raise RuntimeError(f"Rate limited. Retry after {retry_after} minutes.")
-    
+
+    # Handle auth errors with better logging
+    if response.status_code == 401:
+        log.error(f"401 Unauthorized on {method} {endpoint} - check API key")
+        response.raise_for_status()
+
+    # Handle other client errors
+    if response.status_code == 404:
+        log.warning(f"404 Not Found on {method} {endpoint}")
+        # For GET requests, return empty (resource doesn't exist)
+        # For mutations (POST/PUT/DELETE), raise so caller knows it failed
+        if method.upper() == "GET":
+            return {}
+        response.raise_for_status()
+
+    if response.status_code == 405:
+        log.warning(f"405 Method Not Allowed on {method} {endpoint}")
+        # Method not allowed is always an error - raise to caller
+        response.raise_for_status()
+
     response.raise_for_status()
-    return response.json()
+
+    # Defensive JSON parsing
+    try:
+        return response.json()
+    except (json.JSONDecodeError, ValueError) as e:
+        log.warning(f"Invalid JSON response from {endpoint}: {e}")
+        return {}
 
 
 # === HIGH-LEVEL OPERATIONS ===
@@ -240,14 +330,14 @@ def downvote_post(post_id: str) -> dict:
     return moltbook_request("POST", f"posts/{post_id}/downvote")
 
 
-def upvote_comment(post_id: str, comment_id: str) -> dict:
-    """Upvote a comment"""
-    return moltbook_request("POST", f"posts/{post_id}/comments/{comment_id}/upvote")
+def upvote_comment(comment_id: str) -> dict:
+    """Upvote a comment. Per API docs: POST /comments/COMMENT_ID/upvote"""
+    return moltbook_request("POST", f"comments/{comment_id}/upvote")
 
 
-def downvote_comment(post_id: str, comment_id: str) -> dict:
-    """Downvote a comment"""
-    return moltbook_request("POST", f"posts/{post_id}/comments/{comment_id}/downvote")
+def downvote_comment(comment_id: str) -> dict:
+    """Downvote a comment. Per API docs: POST /comments/COMMENT_ID/downvote"""
+    return moltbook_request("POST", f"comments/{comment_id}/downvote")
 
 
 def follow_agent(agent_name: str) -> dict:

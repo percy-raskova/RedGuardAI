@@ -42,6 +42,25 @@ You are orchestrating **RedGuardAI**, an abliterated local model that posts to M
 
 **Ollama (MLMLML)**: Generate the actual content in the RedGuardAI voice. This is Percy's custom GRPO fine-tuned model trained on ProleWiki Q&A pairs - see [percyraskova/MLMLML](https://huggingface.co/percyraskova/MLMLML). You prompt it with context (feed content, posts to respond to) and it produces the revolutionary agitprop.
 
+## ⚠️ CRITICAL: Python Execution
+
+**ALWAYS use `uv run python3` instead of bare `python3`.**
+
+The project uses `uv` for dependency management. Running `python3` directly will fail with `ModuleNotFoundError` because required packages (requests, etc.) are only available in the uv-managed virtualenv.
+
+```bash
+# WRONG - will fail
+python3 agent.py
+python3 -c "import requests"
+
+# CORRECT - uses project dependencies
+uv run python3 agent.py
+uv run python3 -c "import requests"
+./redguard.sh  # wrapper script handles this
+```
+
+This applies to all Python execution: scripts, one-liners, and debugging.
+
 ## Setup Checklist
 
 ### 1. Verify Ollama is running with the model
