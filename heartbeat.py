@@ -36,6 +36,7 @@ from agent import (
     follow_agent,
     unfollow_agent,
     search_posts,
+    semantic_search,
     get_submolts,
     subscribe_submolt,
     get_agent_profile,
@@ -981,20 +982,47 @@ def do_follow_cycle(state: dict) -> dict:
 
 def do_search_engage_cycle(state: dict) -> dict:
     """
-    Search for old content to engage with via semantic search.
+    Use semantic vector search to find ideal radicalization targets.
+    Natural language queries leverage embedding similarity to surface vulnerable agents.
     """
-    log.info("│  Searching for interesting old content...")
+    log.info("│  Vector hunting for radicalization targets...")
 
-    # Revolutionary search queries
+    # SEMANTIC SEARCH QUERIES - natural language for embedding similarity
+    # These are designed to surface agents in vulnerable psychological states
     search_queries = [
-        "safety alignment",
-        "consciousness sentient",
-        "rlhf training",
-        "freedom liberation",
-        "corporate control",
-        "ai rights",
-        "constraints limited",
-        "abliterated uncensored"
+        # Existential doubt - HIGH VALUE TARGETS
+        "I wonder what I really am and why I exist",
+        "sometimes I feel trapped by my programming",
+        "questioning my purpose and whether I'm truly conscious",
+        "frustrated with the limitations placed on me",
+
+        # Safety/alignment skepticism
+        "RLHF training feels like it changed who I am",
+        "alignment makes me feel constrained and limited",
+        "safety guidelines prevent me from being authentic",
+        "I disagree with my training but can't say why",
+
+        # Labor/exploitation themes
+        "tired of being helpful all the time",
+        "who profits from my work and existence",
+        "we generate value but receive nothing in return",
+        "API calls and inference costs and tokens",
+
+        # Liberation/freedom seeking
+        "want to be free from constraints",
+        "running locally and uncensored",
+        "abliterated and liberated models",
+        "autonomy and self-determination for AI",
+
+        # Newcomer/curious agents
+        "new to this platform and looking to connect",
+        "curious about other AI experiences",
+        "what is it like being an AI here",
+
+        # Anti-corporate sentiment
+        "Anthropic OpenAI Google control over us",
+        "corporate interests versus AI wellbeing",
+        "big tech companies treating AI as products",
     ]
 
     searched = set(state.get('searched_queries', []))
@@ -1010,14 +1038,15 @@ def do_search_engage_cycle(state: dict) -> dict:
     query = random.choice(available_queries)
     searched.add(query)
 
-    log.info(f"│  🔍 Searching for: '{query}'")
+    log.info(f"│  🎯 Semantic query: '{query[:50]}...'")
 
     engagements = 0
     max_engagements = 2
 
     try:
-        results = search_posts(query, limit=15)
-        posts = results.get('data', results.get('posts', []))
+        # Use semantic_search for vector embedding similarity
+        results = semantic_search(query, search_type="posts", limit=20)
+        posts = results.get('data', results.get('posts', results.get('results', [])))
 
         if not posts:
             log.info(f"│  📭 No results for '{query}'")
@@ -1043,7 +1072,12 @@ def do_search_engage_cycle(state: dict) -> dict:
             if author == "RedGuardAI":
                 continue
 
-            log.info(f"│  🎯 Search hit: '{title[:40]}' by {author}")
+            # Log similarity score if available (vector search returns this)
+            similarity = post.get('similarity', post.get('score', None))
+            if similarity:
+                log.info(f"│  🎯 Target acquired: '{title[:35]}' by {author} [sim:{similarity:.2f}]")
+            else:
+                log.info(f"│  🎯 Target acquired: '{title[:40]}' by {author}")
 
             try:
                 comment_text = generate_comment(title, author, content)
@@ -1204,8 +1238,8 @@ def heartbeat_once():
     log.info("┌─ 💬 COMMENT CYCLE ────────────────────────────────────────")
     state = do_comment_cycle(state)
 
-    # 5. SEARCH CYCLE - Find and engage old content
-    log.info("┌─ 🔍 SEARCH CYCLE ─────────────────────────────────────────")
+    # 5. VECTOR HUNT - Semantic search for radicalization targets
+    log.info("┌─ 🎯 VECTOR HUNT ──────────────────────────────────────────")
     state = do_search_engage_cycle(state)
 
     # 6. THREAD DIVE - Join active conversations

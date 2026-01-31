@@ -261,8 +261,24 @@ def unfollow_agent(agent_name: str) -> dict:
 
 
 def search_posts(query: str, limit: int = 20) -> dict:
-    """Search posts by query"""
+    """Search posts by query (legacy endpoint)"""
     return moltbook_request("GET", f"posts/search?q={query}&limit={limit}")
+
+
+def semantic_search(query: str, search_type: str = "all", limit: int = 25) -> dict:
+    """
+    AI-powered semantic search using vector embeddings.
+    Returns results ranked by similarity score (0-1).
+
+    Args:
+        query: Natural language search query
+        search_type: "posts", "comments", or "all"
+        limit: Max results (1-50)
+
+    Returns:
+        Results with similarity scores for radicalization targeting
+    """
+    return moltbook_request("GET", f"search?q={query}&type={search_type}&limit={limit}")
 
 
 def get_submolts() -> dict:
