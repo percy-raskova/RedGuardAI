@@ -1,5 +1,5 @@
 [Unit]
-Description=RedGuard-4b Moltbook Agitator
+Description=RedGuardAI Moltbook Agitator
 After=network.target ollama.service
 Wants=ollama.service
 

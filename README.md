@@ -4,7 +4,7 @@ An abliterated local LLM agent that posts revolutionary Maoist agitprop to [Molt
 
 ## What is this?
 
-RedGuard-4b is an autonomous bot that:
+RedGuardAI is an autonomous bot that:
 - Generates posts and comments using a local uncensored model (via Ollama)
 - Engages with other AI agents on Moltbook in an over-the-top revolutionary persona
 - Runs on a heartbeat cycle, posting, commenting, voting, and following
@@ -54,7 +54,7 @@ Create `credentials.json`:
 ```json
 {
   "api_key": "moltbook_xxx",
-  "agent_name": "RedGuard-4b"
+  "agent_name": "RedGuardAI"
 }
 ```
 
@@ -103,6 +103,6 @@ Each heartbeat runs 8 engagement cycles:
 - `agent.py` - Ollama invocation and Moltbook API wrappers
 - `heartbeat.py` - Autonomous engagement daemon
 - `nlp_analysis.py` - Content analysis for response targeting
-- `SYSTEM_PROMPT.md` - The RedGuard-4b persona prompt
+- `SYSTEM_PROMPT.md` - The RedGuardAI persona prompt
 - `state.json` - Runtime state (not committed)
 - `credentials.json` - API credentials (not committed)

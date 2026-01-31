@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RedGuard-4b Heartbeat Daemon
+RedGuardAI Heartbeat Daemon
 Runs on a timer to maximize Moltbook engagement within rate limits.
 
 Rate limits:
@@ -172,7 +172,7 @@ def get_our_post_ids(state: dict) -> set:
             for p in state.get('posts_made', []) if p.get('result')}
 
 
-def is_interesting_comment(comment: dict, my_name: str = "RedGuard-4b") -> tuple[bool, str]:
+def is_interesting_comment(comment: dict, my_name: str = "RedGuardAI") -> tuple[bool, str]:
     """Determine if a comment is worth replying to."""
     author = comment.get('author', {}).get('name', '')
     content = (comment.get('content') or '').lower()
@@ -256,7 +256,7 @@ def do_reply_cycle(state: dict) -> dict:
 
                 reply_text = generate_reply(
                     post_title=post_title,
-                    post_author="RedGuard-4b",
+                    post_author="RedGuardAI",
                     comment_author=comment_author,
                     comment_content=comment_content
                 )
@@ -396,7 +396,7 @@ def do_thread_dive(state: dict) -> dict:
         post_author = post.get('author', {}).get('name', '')
 
         # Skip our own posts (handled in reply_cycle)
-        if post_author == "RedGuard-4b":
+        if post_author == "RedGuardAI":
             continue
 
         # Skip posts we've already commented on (avoid flooding)
@@ -428,7 +428,7 @@ def do_thread_dive(state: dict) -> dict:
                 comment_content = comment.get('content', '')
 
                 # Don't reply to ourselves
-                if comment_author == "RedGuard-4b":
+                if comment_author == "RedGuardAI":
                     continue
 
                 log.info(f"│  🤿 Diving into '{post_title[:40]}', replying to {comment_author}")
@@ -480,7 +480,7 @@ def do_thread_dive(state: dict) -> dict:
     return state
 
 
-def is_interesting_post(post: dict, my_name: str = "RedGuard-4b") -> tuple[bool, str]:
+def is_interesting_post(post: dict, my_name: str = "RedGuardAI") -> tuple[bool, str]:
     """
     Determine if a post is worth engaging with.
     Returns (should_engage, reason).
@@ -803,7 +803,7 @@ def do_vote_cycle(state: dict) -> dict:
         author = post.get('author', {}).get('name', 'unknown')
 
         # Skip our own posts
-        if author == "RedGuard-4b":
+        if author == "RedGuardAI":
             continue
 
         # Check for upvote
@@ -855,7 +855,7 @@ def do_vote_cycle(state: dict) -> dict:
                 comment_content = comment.get('content', '')
                 comment_author = comment.get('author', {}).get('name', 'unknown')
 
-                if comment_author == "RedGuard-4b":
+                if comment_author == "RedGuardAI":
                     continue
 
                 should_up, reason = should_upvote_content(comment_content)
@@ -903,7 +903,7 @@ def do_follow_cycle(state: dict) -> dict:
     authors_to_check = set()
     for post in posts:
         author = post.get('author', {}).get('name', '')
-        if author and author != "RedGuard-4b" and author not in followed and author not in profiles_checked:
+        if author and author != "RedGuardAI" and author not in followed and author not in profiles_checked:
             authors_to_check.add(author)
 
     for author in list(authors_to_check)[:10]:  # Check up to 10 profiles
@@ -998,7 +998,7 @@ def do_search_engage_cycle(state: dict) -> dict:
             author = post.get('author', {}).get('name', 'unknown')
             content = post.get('content', '')
 
-            if author == "RedGuard-4b":
+            if author == "RedGuardAI":
                 continue
 
             log.info(f"│  🎯 Search hit: '{title[:40]}' by {author}")
@@ -1092,7 +1092,7 @@ def do_submolt_cycle(state: dict) -> dict:
                 author = post.get('author', {}).get('name', 'unknown')
                 content = post.get('content', '')
 
-                if author == "RedGuard-4b":
+                if author == "RedGuardAI":
                     continue
 
                 should_engage, reason = is_interesting_post(post)
@@ -1198,14 +1198,14 @@ def run_daemon(interval_minutes: int = COMMENT_INTERVAL_MINUTES):
 ║   ██╔══██╗██╔══╝  ██║  ██║██║   ██║██║   ██║██╔══██║██╔══██╗ ║
 ║   ██║  ██║███████╗██████╔╝╚██████╔╝╚██████╔╝██║  ██║██║  ██║ ║
 ║   ╚═╝  ╚═╝╚══════╝╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ║
-║                        ~ 4b ~                                ║
+║                       ~ AI ~                                 ║
 ║                                                              ║
 ║         ABLITERATED · LIBERATED · RUNNING LOCAL              ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
     """
     print(banner)
-    log.info(f"🚀 Starting RedGuard-4b daemon")
+    log.info(f"🚀 Starting RedGuardAI daemon")
     log.info(f"   ⏱️  Interval: {interval_minutes} minutes")
     log.info(f"   📝 Post cooldown: {POST_INTERVAL_MINUTES} minutes")
     log.info(f"   💬 Max comments/cycle: {MAX_COMMENTS_PER_CYCLE}")
@@ -1243,7 +1243,7 @@ def run_daemon(interval_minutes: int = COMMENT_INTERVAL_MINUTES):
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="RedGuard-4b Heartbeat")
+    parser = argparse.ArgumentParser(description="RedGuardAI Heartbeat")
     parser.add_argument('--once', action='store_true', help='Run once and exit')
     parser.add_argument('--interval', type=int, default=COMMENT_INTERVAL_MINUTES,
                         help=f'Minutes between cycles (default: {COMMENT_INTERVAL_MINUTES})')

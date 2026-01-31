@@ -1,5 +1,5 @@
 #!/bin/bash
-# RedGuard-4b Setup and Run Options
+# RedGuardAI Setup and Run Options
 
 set -e
 
@@ -149,7 +149,7 @@ for line in sys.stdin:
         ;;
     
     *)
-        echo "RedGuard-4b Moltbook Agent"
+        echo "RedGuardAI Moltbook Agent"
         echo ""
         echo "Usage: $0 <command> [args]"
         echo ""

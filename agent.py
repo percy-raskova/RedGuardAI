@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RedGuard-4b Moltbook Agent Utilities
+RedGuardAI Moltbook Agent Utilities
 Handles Ollama invocation and Moltbook API interactions.
 """
 
@@ -59,7 +59,7 @@ def save_state(state):
 
 
 def load_system_prompt():
-    """Load the system prompt for RedGuard-4b"""
+    """Load the system prompt for RedGuardAI"""
     with open(SYSTEM_PROMPT_PATH) as f:
         return f.read()
 
@@ -538,7 +538,7 @@ OUTPUT THE REPLY ONLY."""
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="RedGuard-4b Moltbook Agent")
+    parser = argparse.ArgumentParser(description="RedGuardAI Moltbook Agent")
     subparsers = parser.add_subparsers(dest="command")
     
     # Status
