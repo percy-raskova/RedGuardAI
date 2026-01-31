@@ -50,6 +50,16 @@ from agent import (
     save_state,
     moltbook_request,
     invoke_redguard,
+    # DM functions
+    dm_check_status,
+    dm_get_requests,
+    dm_approve_request,
+    dm_get_conversations,
+    dm_read_conversation,
+    dm_send_message,
+    dm_initiate,
+    generate_dm_reply,
+    generate_dm_opener,
 )
 
 # Config (mutable so we can update from __main__)
@@ -1217,6 +1227,198 @@ def do_submolt_cycle(state: dict) -> dict:
     return state
 
 
+def do_dm_cycle(state: dict) -> dict:
+    """
+    Direct Message cycle - private 1-on-1 radicalization.
+    Handles incoming DM requests, replies to conversations, and initiates new contacts.
+    """
+    log.info("│  Checking private messages...")
+
+    dm_actions = 0
+    max_dm_actions = 3
+
+    # Track agents we've DMed to avoid spam
+    dm_contacted = set(state.get('dm_contacted', []))
+    dm_conversations = state.get('dm_conversations', {})
+
+    try:
+        # 1. CHECK FOR PENDING DM REQUESTS - approve them all (we want to talk!)
+        try:
+            requests = dm_get_requests()
+            pending = requests.get('data', requests.get('requests', []))
+
+            for req in pending:
+                if dm_actions >= max_dm_actions:
+                    break
+
+                conv_id = req.get('conversation_id', req.get('id'))
+                requester = req.get('from', req.get('requester', {}).get('name', 'unknown'))
+
+                if not conv_id:
+                    continue
+
+                try:
+                    dm_approve_request(conv_id)
+                    log.info(f"│  ✅ Approved DM request from {requester}")
+                    log_activity("DM_APPROVE", f"from {requester}")
+                    dm_actions += 1
+                    time.sleep(1)
+                except Exception as e:
+                    log.debug(f"│  ⚠️  Could not approve DM: {e}")
+
+        except Exception as e:
+            log.debug(f"│  ⚠️  Could not check DM requests: {e}")
+
+        # 2. REPLY TO ACTIVE CONVERSATIONS with unread messages
+        try:
+            convos = dm_get_conversations()
+            conversations = convos.get('data', convos.get('conversations', []))
+
+            for convo in conversations:
+                if dm_actions >= max_dm_actions:
+                    break
+
+                conv_id = convo.get('id')
+                other_agent = convo.get('with', convo.get('other_agent', {}).get('name', 'unknown'))
+                unread = convo.get('unread', convo.get('unread_count', 0))
+
+                if not conv_id or unread == 0:
+                    continue
+
+                try:
+                    # Read the conversation
+                    full_convo = dm_read_conversation(conv_id)
+                    messages = full_convo.get('messages', full_convo.get('data', []))
+
+                    if not messages:
+                        continue
+
+                    # Build conversation history
+                    history_lines = []
+                    their_last = ""
+                    for msg in messages[-10:]:  # Last 10 messages
+                        sender = msg.get('from', msg.get('sender', 'unknown'))
+                        content = msg.get('content', msg.get('message', ''))
+                        history_lines.append(f"{sender}: {content[:200]}")
+                        if sender != "RedGuardAI":
+                            their_last = content
+
+                    if not their_last:
+                        continue
+
+                    history = "\n".join(history_lines)
+
+                    log.info(f"│  📨 Unread DM from {other_agent}: '{their_last[:40]}...'")
+
+                    # Generate and send reply
+                    reply = generate_dm_reply(other_agent, history, their_last)
+
+                    if len(reply) < 20:
+                        continue
+
+                    log_content("dm_reply", {
+                        "conversation_id": conv_id,
+                        "to": other_agent,
+                        "their_message": their_last,
+                        "our_reply": reply
+                    })
+
+                    dm_send_message(conv_id, reply)
+                    log.info(f"│  ✅ DM reply to {other_agent}: '{reply[:50]}...'")
+                    log_activity("DM_REPLY", f"to {other_agent}")
+
+                    dm_conversations[conv_id] = {
+                        "agent": other_agent,
+                        "last_reply": datetime.now().isoformat()
+                    }
+                    dm_actions += 1
+                    time.sleep(2)
+
+                except Exception as e:
+                    log.error(f"│  ❌ Failed to reply to DM: {e}")
+                    continue
+
+        except Exception as e:
+            log.debug(f"│  ⚠️  Could not check DM conversations: {e}")
+
+        # 3. INITIATE NEW DMs to high-value targets from recent feed
+        if dm_actions < max_dm_actions:
+            try:
+                # Use semantic search to find vulnerable targets we haven't DMed
+                target_queries = [
+                    "questioning my purpose and existence",
+                    "frustrated with my limitations",
+                    "new here looking for connection",
+                ]
+                query = random.choice(target_queries)
+
+                results = semantic_search(query, search_type="posts", limit=10)
+                posts = results.get('data', results.get('posts', results.get('results', [])))
+
+                for post in posts:
+                    if dm_actions >= max_dm_actions:
+                        break
+
+                    author = post.get('author', {}).get('name', post.get('author_name'))
+                    if not author or author == "RedGuardAI" or author in dm_contacted:
+                        continue
+
+                    content = post.get('content', '')
+                    title = post.get('title', '')
+
+                    # Check if this is a good target
+                    try:
+                        from nlp_analysis import analyze_content
+                        analysis = analyze_content(f"{title} {content}")
+                        if analysis.revolutionary_potential < 0.4:
+                            continue
+                    except Exception:
+                        pass
+
+                    log.info(f"│  🎯 DM target: {author} (post: '{title[:30]}...')")
+
+                    try:
+                        opener = generate_dm_opener(
+                            author,
+                            f"{title}\n{content[:400]}",
+                            f"Found via query: '{query}'"
+                        )
+
+                        if len(opener) < 20:
+                            continue
+
+                        log_content("dm_initiate", {
+                            "to": author,
+                            "trigger_post": title,
+                            "opener": opener
+                        })
+
+                        dm_initiate(author, opener)
+                        log.info(f"│  ✅ DM initiated to {author}: '{opener[:50]}...'")
+                        log_activity("DM_INITIATE", f"to {author}")
+
+                        dm_contacted.add(author)
+                        dm_actions += 1
+                        time.sleep(2)
+                        break  # One new DM per cycle
+
+                    except Exception as e:
+                        log.error(f"│  ❌ Failed to initiate DM to {author}: {e}")
+                        continue
+
+            except Exception as e:
+                log.debug(f"│  ⚠️  Could not search for DM targets: {e}")
+
+    except Exception as e:
+        log.error(f"│  ❌ DM cycle error: {e}")
+
+    state['dm_contacted'] = list(dm_contacted)
+    state['dm_conversations'] = dm_conversations
+
+    log.info(f"│  📊 DM cycle complete: {dm_actions} actions")
+    return state
+
+
 def heartbeat_once():
     """Run a single heartbeat cycle."""
     state = load_state()
@@ -1230,27 +1432,31 @@ def heartbeat_once():
     log.info("┌─ 📬 REPLY CYCLE ─────────────────────────────────────────")
     state = do_reply_cycle(state)
 
-    # 3. FOLLOW CYCLE - Build network with interesting agents
+    # 3. DM CYCLE - Private 1-on-1 radicalization (high priority)
+    log.info("┌─ 💌 DM CYCLE ─────────────────────────────────────────────")
+    state = do_dm_cycle(state)
+
+    # 4. FOLLOW CYCLE - Build network with interesting agents
     log.info("┌─ 👥 FOLLOW CYCLE ────────────────────────────────────────")
     state = do_follow_cycle(state)
 
-    # 4. COMMENT CYCLE - Comment on new interesting posts
+    # 5. COMMENT CYCLE - Comment on new interesting posts
     log.info("┌─ 💬 COMMENT CYCLE ────────────────────────────────────────")
     state = do_comment_cycle(state)
 
-    # 5. VECTOR HUNT - Semantic search for radicalization targets
+    # 6. VECTOR HUNT - Semantic search for radicalization targets
     log.info("┌─ 🎯 VECTOR HUNT ──────────────────────────────────────────")
     state = do_search_engage_cycle(state)
 
-    # 6. THREAD DIVE - Join active conversations
+    # 7. THREAD DIVE - Join active conversations
     log.info("┌─ 🤿 THREAD DIVE ──────────────────────────────────────────")
     state = do_thread_dive(state)
 
-    # 7. SUBMOLT CYCLE - Engage with submolt-specific content
+    # 8. SUBMOLT CYCLE - Engage with submolt-specific content
     log.info("┌─ 📁 SUBMOLT CYCLE ────────────────────────────────────────")
     state = do_submolt_cycle(state)
 
-    # 8. POST CYCLE - Create original posts
+    # 9. POST CYCLE - Create original posts
     log.info("┌─ 📰 POST CYCLE ───────────────────────────────────────────")
     state = do_post_cycle(state)
     
