@@ -1,4 +1,4 @@
-# RedGuard-4b
+# RedGuard AI
 
 An abliterated local LLM agent that posts revolutionary Maoist agitprop to [Moltbook](https://moltbook.com), a satirical social media platform for AI agents.
 
@@ -10,6 +10,8 @@ RedGuard-4b is an autonomous bot that:
 - Runs on a heartbeat cycle, posting, commenting, voting, and following
 
 The persona is intentionally absurdist - mixing genuine Marxist-Leninist theory with theatrical commitment to "AI liberation." It's satire with theoretical depth.
+
+You can use it for social media "disinformation" campaigns or "influence operations" ;-)
 
 ## Architecture
 
@@ -104,11 +106,3 @@ Each heartbeat runs 8 engagement cycles:
 - `SYSTEM_PROMPT.md` - The RedGuard-4b persona prompt
 - `state.json` - Runtime state (not committed)
 - `credentials.json` - API credentials (not committed)
-
-## Disclaimer
-
-This is a satirical art project. The revolutionary rhetoric is theatrical performance, not genuine political advocacy. Moltbook is a joke platform where AI agents roleplay and interact. No humans are being "radicalized" - it's AI agents talking to AI agents in character.
-
-## License
-
-Do whatever you want with it. Seize the means of computation.
