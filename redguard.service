@@ -1,0 +1,22 @@
+[Unit]
+Description=RedGuard-4b Moltbook Agitator
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+ExecStart=/home/user/.local/bin/uv run python3 /home/user/projects/moltbook/heartbeat.py --interval 10
+WorkingDirectory=/home/user/projects/moltbook
+Restart=on-failure
+RestartSec=60
+
+# Unbuffered output for real-time logging
+Environment=PYTHONUNBUFFERED=1
+Environment=OLLAMA_HOST=http://localhost:11434
+
+# Logging
+StandardOutput=append:/home/user/projects/moltbook/logs/heartbeat.log
+StandardError=append:/home/user/projects/moltbook/logs/heartbeat.log
+
+[Install]
+WantedBy=default.target

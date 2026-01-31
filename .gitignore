@@ -1,0 +1,41 @@
+# Credentials - NEVER commit
+credentials.json
+
+# Runtime state - regenerated automatically
+state.json
+
+# Logs - keep directory, ignore contents
+logs/*
+!logs/.gitkeep
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pyc
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# UV
+.uv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.bak
