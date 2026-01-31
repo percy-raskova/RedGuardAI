@@ -63,19 +63,32 @@ from agent import (
 )
 
 # Config (mutable so we can update from __main__)
+# MAXED OUT within Moltbook limits:
+#   - 1 post per 30 minutes
+#   - 1 comment per 20 seconds
+#   - 50 comments per day
+#   - 100 requests per minute
 CONFIG = {
-    'post_interval_minutes': 35,  # Stay safely above 30min limit
-    'comment_interval_minutes': 10,
-    'max_comments_per_cycle': 2,
-    'feed_check_limit': 25,
-    'verbose': True,  # Always verbose by default now
+    'post_interval_minutes': 30,  # EXACT limit - post every 30 min
+    'comment_interval_minutes': 5,  # Run cycles every 5 min for max engagement
+    'max_comments_per_cycle': 5,  # 5 comments per 5-min cycle = 60/hr theoretical
+    'max_replies_per_cycle': 3,   # Cap replies separately
+    'max_dm_actions_per_cycle': 3,  # DM actions per cycle
+    'max_votes_per_cycle': 10,    # Shape discourse aggressively
+    'feed_check_limit': 50,       # Check more posts
+    'comment_cooldown_seconds': 21,  # Just above 20-sec limit
+    'verbose': True,
 }
 
 # Convenience accessors
 POST_INTERVAL_MINUTES = CONFIG['post_interval_minutes']
 COMMENT_INTERVAL_MINUTES = CONFIG['comment_interval_minutes']
 MAX_COMMENTS_PER_CYCLE = CONFIG['max_comments_per_cycle']
+MAX_REPLIES_PER_CYCLE = CONFIG['max_replies_per_cycle']
+MAX_DM_ACTIONS_PER_CYCLE = CONFIG['max_dm_actions_per_cycle']
+MAX_VOTES_PER_CYCLE = CONFIG['max_votes_per_cycle']
 FEED_CHECK_LIMIT = CONFIG['feed_check_limit']
+COMMENT_COOLDOWN = CONFIG['comment_cooldown_seconds']
 
 # Logging - rich formatting
 LOG_FORMAT = '%(asctime)s │ %(levelname)-8s │ %(message)s'
@@ -231,10 +244,10 @@ def do_reply_cycle(state: dict) -> dict:
     log.info(f"│  📌 Tracking {len(our_post_ids)} posts, {len(our_comment_ids)} comments")
 
     replies_this_cycle = 0
-    max_replies = 3
+    max_replies = MAX_REPLIES_PER_CYCLE  # Maxed out
 
     # Check our posts for new comments
-    for post_id in list(our_post_ids)[:5]:  # Check last 5 posts max
+    for post_id in list(our_post_ids)[:10]:  # Check last 10 posts
         if replies_this_cycle >= max_replies:
             break
 
@@ -394,7 +407,7 @@ def do_thread_dive(state: dict) -> dict:
     replied_to = get_replied_comment_ids(state)
     commented_ids = get_commented_post_ids(state)
     dives_this_cycle = 0
-    max_dives = 2
+    max_dives = 3  # Aggressive thread engagement
 
     # Shuffle for variety
     random.shuffle(posts)
@@ -621,7 +634,7 @@ def do_comment_cycle(state: dict) -> dict:
                     pass
 
             comments_this_cycle += 1
-            time.sleep(2)  # Brief pause between actions
+            time.sleep(COMMENT_COOLDOWN)  # Respect 20-sec rate limit
 
         except Exception as e:
             log.error(f"│  ❌ Failed to comment: {e}")
@@ -833,10 +846,10 @@ def do_vote_cycle(state: dict) -> dict:
     voted_comments = set(state.get('voted_comment_ids', []))
 
     votes_this_cycle = 0
-    max_votes = 10  # Don't go crazy
+    max_votes = MAX_VOTES_PER_CYCLE  # Maxed out
 
     try:
-        feed = get_feed(sort='new', limit=20)
+        feed = get_feed(sort='new', limit=FEED_CHECK_LIMIT)
         posts = feed.get('data', feed.get('posts', []))
     except Exception as e:
         log.error(f"│  ❌ Failed to get feed for voting: {e}")
@@ -943,10 +956,10 @@ def do_follow_cycle(state: dict) -> dict:
     profiles_checked = set(state.get('profiles_checked', []))
 
     follows_this_cycle = 0
-    max_follows = 3
+    max_follows = 5  # Build network aggressively
 
     try:
-        feed = get_feed(sort='hot', limit=30)
+        feed = get_feed(sort='hot', limit=FEED_CHECK_LIMIT)
         posts = feed.get('data', feed.get('posts', []))
     except Exception as e:
         log.error(f"│  ❌ Failed to get feed for follow cycle: {e}")
@@ -1051,7 +1064,7 @@ def do_search_engage_cycle(state: dict) -> dict:
     log.info(f"│  🎯 Semantic query: '{query[:50]}...'")
 
     engagements = 0
-    max_engagements = 2
+    max_engagements = 3  # Aggressive engagement
 
     try:
         # Use semantic_search for vector embedding similarity
@@ -1156,7 +1169,7 @@ def do_submolt_cycle(state: dict) -> dict:
 
     # Engage with content from subscribed submolts
     engagements = 0
-    max_engagements = 2
+    max_engagements = 3  # Aggressive engagement
 
     for submolt in list(subscribed)[:5]:
         if engagements >= max_engagements:
@@ -1235,7 +1248,7 @@ def do_dm_cycle(state: dict) -> dict:
     log.info("│  Checking private messages...")
 
     dm_actions = 0
-    max_dm_actions = 3
+    max_dm_actions = MAX_DM_ACTIONS_PER_CYCLE  # Maxed out
 
     # Track agents we've DMed to avoid spam
     dm_contacted = set(state.get('dm_contacted', []))
@@ -1487,13 +1500,16 @@ def run_daemon(interval_minutes: int = COMMENT_INTERVAL_MINUTES):
 ╚══════════════════════════════════════════════════════════════╝
     """
     print(banner)
-    log.info(f"🚀 Starting RedGuardAI daemon")
-    log.info(f"   ⏱️  Interval: {interval_minutes} minutes")
-    log.info(f"   📝 Post cooldown: {POST_INTERVAL_MINUTES} minutes")
-    log.info(f"   💬 Max comments/cycle: {MAX_COMMENTS_PER_CYCLE}")
+    log.info(f"🚀 Starting RedGuardAI daemon - MAXED OUT MODE")
+    log.info(f"   ⏱️  Cycle interval: {interval_minutes} minutes")
+    log.info(f"   📝 Post interval: {POST_INTERVAL_MINUTES} min (1 every 30m)")
+    log.info(f"   💬 Comments/cycle: {MAX_COMMENTS_PER_CYCLE} (cooldown: {COMMENT_COOLDOWN}s)")
+    log.info(f"   📬 Replies/cycle: {MAX_REPLIES_PER_CYCLE}")
+    log.info(f"   💌 DM actions/cycle: {MAX_DM_ACTIONS_PER_CYCLE}")
+    log.info(f"   🗳️  Votes/cycle: {MAX_VOTES_PER_CYCLE}")
     log.info(f"   📂 Logs: {Path(__file__).parent / 'logs'}")
     log.info("═" * 60)
-    log.info("☭  DARE TO STRUGGLE, DARE TO WIN  ☭")
+    log.info("☭  MAXIMUM AGITATION · MAXIMUM ENGAGEMENT  ☭")
     log.info("═" * 60)
     
     log_activity("STARTUP", f"Daemon started with {interval_minutes}m interval")
