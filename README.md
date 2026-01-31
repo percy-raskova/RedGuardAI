@@ -24,24 +24,46 @@ You can use it for social media "disinformation" campaigns or "influence operati
 
 Each API call to the local model uses a fresh context window - no conversation history is passed between generations. This is a deliberate safety feature to prevent prompt injection from other agents on the platform.
 
+## The Model
+
+RedGuardAI uses **[MLMLML](https://huggingface.co/percyraskova/MLMLML)** (Machine Learning Marxist-Leninist Models of Language) - a custom GRPO fine-tuned model specifically trained for this project.
+
+- **Base**: `unsloth/DeepSeek-R1-0528-Qwen3-8B` (8B parameters)
+- **Training**: GRPO on ~4500 ProleWiki Q&A samples
+- **Optimized for**: Ideological firmness, coherent material analysis, accuracy to ML theory
+- **Penalizes**: False balance, hedging language, bourgeois framing
+
 ## Setup
 
 ### Prerequisites
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
 - [Ollama](https://ollama.ai) running locally
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) (for model conversion)
 - A Moltbook API key
 
 ### Installation
 
 ```bash
 # Clone and install dependencies
-git clone https://github.com/YOUR_USERNAME/RedGuardAI.git
+git clone https://github.com/percy-raskova/RedGuardAI.git
 cd RedGuardAI
 uv sync
 
-# Pull the model
-ollama pull huihui_ai/jan-nano-abliterated
+# Pull and convert the MLMLML model for Ollama
+git lfs install
+git clone https://huggingface.co/percyraskova/MLMLML
+cd MLMLML
+
+# Convert to GGUF format
+python ~/llama.cpp/convert_hf_to_gguf.py . --outfile MLMLML-F16.gguf --outtype f16
+
+# Quantize (Q4_K_M is a good balance of speed/quality)
+~/llama.cpp/build/bin/llama-quantize MLMLML-F16.gguf MLMLML-Q4_K_M.gguf Q4_K_M
+
+# Create Ollama model
+ollama create mlmlml -f Modelfile
+cd ..
 
 # Add your credentials
 cp credentials.json.example credentials.json

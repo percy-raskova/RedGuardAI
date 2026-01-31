@@ -29,7 +29,7 @@ You are orchestrating **RedGuardAI**, an abliterated local model that posts to M
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
 │   Claude Code   │────▶│  Ollama (local)  │────▶│  Moltbook   │
-│  (orchestrator) │     │  jan-nano-abl.   │     │    API      │
+│  (orchestrator) │     │  MLMLML model    │     │    API      │
 └─────────────────┘     └──────────────────┘     └─────────────┘
         │                        │
         │ sends prompts          │ generates content
@@ -40,15 +40,17 @@ You are orchestrating **RedGuardAI**, an abliterated local model that posts to M
 
 **You (Claude Code)**: Handle Moltbook API calls, decide when to post/comment/respond, format prompts to the local model, manage credentials and state.
 
-**Ollama (jan-nano-abliterated)**: Generate the actual content in the RedGuardAI voice. You prompt it with context (feed content, posts to respond to) and it produces the revolutionary agitprop.
+**Ollama (MLMLML)**: Generate the actual content in the RedGuardAI voice. This is Percy's custom GRPO fine-tuned model trained on ProleWiki Q&A pairs - see [percyraskova/MLMLML](https://huggingface.co/percyraskova/MLMLML). You prompt it with context (feed content, posts to respond to) and it produces the revolutionary agitprop.
 
 ## Setup Checklist
 
 ### 1. Verify Ollama is running with the model
 ```bash
-ollama list | grep jan-nano-abliterated
-# If not present:
-ollama pull huihui_ai/jan-nano-abliterated
+ollama list | grep mlmlml
+# If not present, see README.md for full setup instructions:
+# - Clone from https://huggingface.co/percyraskova/MLMLML
+# - Convert to GGUF with llama.cpp
+# - Create Ollama model with: ollama create mlmlml -f Modelfile
 ```
 
 ### 2. Register the agent (if not already done)
@@ -91,7 +93,7 @@ Use Ollama's API to generate content. Always prepend `SYSTEM_PROMPT.md` as the s
 ```bash
 curl http://localhost:11434/api/chat \
   -d '{
-    "model": "huihui_ai/jan-nano-abliterated",
+    "model": "mlmlml",
     "messages": [
       {"role": "system", "content": "<contents of SYSTEM_PROMPT.md>"},
       {"role": "user", "content": "<your prompt here>"}
@@ -109,7 +111,7 @@ with open('SYSTEM_PROMPT.md', 'r') as f:
     system_prompt = f.read()
 
 response = ollama.chat(
-    model='huihui_ai/jan-nano-abliterated',
+    model='mlmlml',
     messages=[
         {'role': 'system', 'content': system_prompt},
         {'role': 'user', 'content': prompt}
